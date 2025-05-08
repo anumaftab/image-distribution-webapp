@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Image Distribution Web App</title>
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        /* App container constraints for mobile devices */
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #app {
+            max-width: 350px;
+            min-height: 600px;
+            margin: auto;
+            background: #ffffff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            padding-bottom: 20px;
+        }
+        header {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 0 10px;
+        }
+        nav button {
+            flex: 1;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .image-card {
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            background: white;
+        }
+        .image-card img {
+            max-width: 100%;
+            border-radius: 6px;
+        }
+        .metadata {
+            font-size: 0.85rem;
+            color: #555;
+            margin-top: 5px;
+        }
+        .comments {
+            margin-top: 10px;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+        .comment {
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+        }
+        .rating {
+            font-size: 0.9rem;
+            margin-top: 5px;
+            color: #ffa500;
+        }
+        .form-label {
+            font-weight: 600;
+        }
+        button:disabled {
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>Image Distribution Web App</header>
+        <nav>
+            <button id="creatorViewBtn" class="btn btn-primary active">Creator View</button>
+            <button id="consumerViewBtn" class="btn btn-outline-primary">Consumer View</button>
+        </nav>
+
+        <!-- Creator View -->
+        <section id="creatorView">
+            <form id="uploadForm" class="p-3">
+                <div class="mb-3">
+                    <label for="imageFile" class="form-label">Select Image to upload</label>
+                    <input type="file" id="imageFile" accept="image/*" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" id="title" class="form-control" placeholder="Image title" required />
+                </div>
+                <div class="mb-3">
+                    <label for="caption" class="form-label">Caption</label>
+                    <textarea id="caption" class="form-control" rows="2" placeholder="Write a caption" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" id="location" class="form-control" placeholder="Where was this taken?" />
+                </div>
+                <div class="mb-3">
+                    <label for="people" class="form-label">People Present</label>
+                    <input type="text" id="people" class="form-control" placeholder="Names separated by commas" />
+                </div>
+                <button type="submit" class="btn btn-success w-100">Upload Image</button>
+                <div id="uploadStatus" class="mt-2 text-center"></div>
+            </form>
+        </section>
+
+        <!-- Consumer View -->
+        <section id="consumerView" class="hidden p-3">
+            <div class="mb-3">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search images by title or caption" />
+            </div>
+            <div id="imagesContainer">
+                <!-- Dynamically loaded images will appear here -->
+                <p class="text-muted text-center">No images to display yet.</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Bootstrap JS Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Track view buttons and sections
+        const creatorViewBtn = document.getElementById('creatorViewBtn');
+        const consumerViewBtn = document.getElementById('consumerViewBtn');
+        const creatorView = document.getElementById('creatorView');
+        const consumerView = document.getElementById('consumerView');
+
+        // Switch views on button clicks
+        creatorViewBtn.addEventListener('click', () => {
+            creatorViewBtn.classList.add('btn-primary', 'active');
+            creatorViewBtn.classList.remove('btn-outline-primary');
+            consumerViewBtn.classList.remove('btn-primary', 'active');
+            consumerViewBtn.classList.add('btn-outline-primary');
+            creatorView.classList.remove('hidden');
+            consumerView.classList.add('hidden');
+        });
+
+        consumerViewBtn.addEventListener('click', () => {
+            consumerViewBtn.classList.add('btn-primary', 'active');
+            consumerViewBtn.classList.remove('btn-outline-primary');
+            creatorViewBtn.classList.remove('btn-primary', 'active');
+            creatorViewBtn.classList.add('btn-outline-primary');
+            creatorView.classList.add('hidden');
+            consumerView.classList.remove('hidden');
+            loadImages();
+        });
+
+        // Mock in-memory storage for images
+        // In real app, replace with API calls to backend
+        const images = [];
+
+        // Upload form logic
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        uploadForm.addEventListener('submit', event => {
+            event.preventDefault();
+
+            // Validate fields (HTML5 does basic validation too)
+            const fileInput = document.getElementById('imageFile');
+            const title = document.getElementById('title').value.trim();
+            const caption = document.getElementById('caption').value.trim();
+            const location = document.getElementById('location').value.trim();
+            const people = document.getElementById('people').value.trim();
+
+            if (!fileInput.files.length) {
+                alert('Please select an image file.');
+                return;
+            }
+
+            // Read the file as Data URL for preview/storage (simulate upload)
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Save image data + metadata to local images array (simulate backend persistence)
+                images.push({
+                    id: Date.now(),
+                    dataUrl: e.target.result,
+                    title,
+                    caption,
+                    location,
+                    people: people ? people.split(',').map(s => s.trim()) : [],
+                    comments: [],
+                    rating: null
+                });
+
+                // Reset form
+                uploadForm.reset();
+
+                uploadStatus.textContent = 'Image uploaded successfully!';
+                setTimeout(() => uploadStatus.textContent = '', 3000);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Consumer view: load images and render
+        const imagesContainer = document.getElementById('imagesContainer');
+        const searchInput = document.getElementById('searchInput');
+
+        function loadImages() {
+            const query = searchInput.value.toLowerCase();
+
+            // Clear container
+            imagesContainer.innerHTML = '';
+
+            // Filter images by title or caption
+            const filteredImages = images.filter(img => 
+                img.title.toLowerCase().includes(query) || img.caption.toLowerCase().includes(query)
+            );
+
+            if (!filteredImages.length) {
+                imagesContainer.innerHTML = '<p class="text-muted text-center">No images found.</p>';
+                return;
+            }
+
+            // Render each image with details, comment and rating UI
+            filteredImages.forEach(img => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+
+                card.innerHTML = `
+                    <img src="${img.dataUrl}" alt="${img.title}" />
+                    <div class="metadata">
+                        <strong>${img.title}</strong><br />
+                        ${img.caption}<br />
+                        ${img.location ? `<em>Location: ${img.location}</em><br />` : ''}
+                        ${img.people.length ? `<em>People: ${img.people.join(', ')}</em><br />` : ''}
+                    </div>
+                    <div class="comments">
+                        <strong>Comments:</strong>
+                        <div id="comments-${img.id}">
+                            ${img.comments.length ? img.comments.map(c => `<div class="comment">${c}</div>`).join('') : '<em>No comments yet</em>'}
+                        </div>
+                        <input type="text" id="commentInput-${img.id}" class="form-control form-control-sm mt-1" placeholder="Add a comment" />
+                        <button class="btn btn-sm btn-primary mt-1" onclick="addComment(${img.id})">Add Comment</button>
+                    </div>
+                    <div class="rating">
+                        <label>Rate this image:</label><br />
+                        <select id="ratingSelect-${img.id}" onchange="addRating(${img.id})" class="form-select form-select-sm w-auto d-inline-block">
+                            <option value="">Select rating</option>
+                            <option value="1" ${img.rating === 1 ? 'selected' : ''}>1</option>
+                            <option value="2" ${img.rating === 2 ? 'selected' : ''}>2</option>
+                            <option value="3" ${img.rating === 3 ? 'selected' : ''}>3</option>
+                            <option value="4" ${img.rating === 4 ? 'selected' : ''}>4</option>
+                            <option value="5" ${img.rating === 5 ? 'selected' : ''}>5</option>
+                        </select>
+                        ${img.rating ? `<span> - You rated this image ${img.rating}/5</span>` : ''}
+                    </div>
+                `;
+
+                imagesContainer.appendChild(card);
+            });
+        }
+
+        // Add comment function
+        function addComment(imageId) {
+            const input = document.getElementById(`commentInput-${imageId}`);
+            const commentText = input.value.trim();
+            if (!commentText) {
+                alert('Please enter a comment.');
+                return;
+            }
+            const img = images.find(i => i.id === imageId);
+            if (!img) return;
+
+            img.comments.push(commentText);
+            input.value = '';
+            loadImages(); // refresh
+        }
+
+        // Add rating function
+        function addRating(imageId) {
+            const select = document.getElementById(`ratingSelect-${imageId}`);
+            const ratingValue = parseInt(select.value);
+            const img = images.find(i => i.id === imageId);
+            if (!img) return;
+
+            if (ratingValue >= 1 && ratingValue <= 5) {
+                img.rating = ratingValue;
+                loadImages(); // refresh
+            }
+        }
+
+        // Filter images on search input change
+        searchInput.addEventListener('input', loadImages);
+
+        // On page load default to creator view
+        creatorViewBtn.click();
+    </script>
+</body>
+</html>
+</content>
+</create_file>
+
+---
+
+### Explanation
+
+- The app uses Bootstrap for a clean, modern UI.
+- Two main views: Creator and Consumer.
+- Creator can upload images with a simple form; images are stored in-memory in the browser (in a real solution, you’d call a backend API to upload/store).
+- Consumer can search images by title/caption, view image details, add comments, and rate images.
+- Fully responsive and fits within 350px width and max of 600px height for mobile usage.
+- The code comments show you where to replace local storage with real backend calls later.
+
+---
+
+If you'd like, I can next help you with implementing the backend (Step 3) or guide you through deploying this frontend to Azure Static Web Apps. Let me know how you'd like to proceed!
